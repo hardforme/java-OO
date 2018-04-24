@@ -76,13 +76,20 @@ class SendCmsg implements Runnable
 		try {
 			 	ObjectOutputStream oos= new ObjectOutputStream(s.getOutputStream());
 		    	Scanner scan = new Scanner(System.in);
+		    	Cmsg msg = null;
 			 	String tmp;
 			 	while((tmp = scan.nextLine()).charAt(0) != '0')
-				 {	
-				 	 Cmsg msg =new Cmsg(tmp.charAt(0),tmp.substring(1));
-				 	 oos.writeObject(msg);
-		             oos.flush();
-		         }			
+			 	{	
+			 		if(tmp.charAt(0) == '1') 
+			 			{
+			 				msg = new Cmsg('1',tmp.split("\\s+")[1],tmp.split("\\s+")[2]); 
+			 				System.out.println(tmp.split("\\s+")[1]);
+			 				System.out.println(tmp.split("\\s+")[2]);
+			 			}
+			 		else msg = new Cmsg(tmp.charAt(0),tmp.substring(1)); 
+			 		oos.writeObject(msg);     
+			 		oos.flush();
+			 	}			
 				oos.close();
 	         }catch(Exception e){
 	        	 System.out.println("Error at sendcmsg："+e);
