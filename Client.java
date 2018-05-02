@@ -1,4 +1,4 @@
-package server;
+package OO;
 
 import java.io.*;
 import java.net.*;
@@ -21,24 +21,6 @@ public class Client {
       }
 }
     
-class Cmsg implements Serializable
-{
-	public char msg_type;
-	public String msg;
-	public String id;
-	public String psw;
-	public Cmsg(char msg_type, String msg)
-	{
-		this.msg_type = msg_type;
-		this.msg = msg;
-	}
-	public Cmsg(char msg_type, String id,String psw)
-	{
-		this.msg_type = msg_type;
-		this.id = id;
-		this.psw = psw;
-	}
-}
 
 class GetSmsg implements Runnable
 {
@@ -76,13 +58,23 @@ class SendCmsg implements Runnable
 		try {
 			 	ObjectOutputStream oos= new ObjectOutputStream(s.getOutputStream());
 		    	Scanner scan = new Scanner(System.in);
+		    	Cmsg msg = null;
 			 	String tmp;
 			 	while((tmp = scan.nextLine()).charAt(0) != '0')
-				 {	
-				 	 Cmsg msg =new Cmsg(tmp.charAt(0),tmp.substring(1));
-				 	 oos.writeObject(msg);
-		             oos.flush();
-		         }			
+			 	{	
+			 		switch(tmp.charAt(0)) 
+			 			{
+			 			case '1':
+			 				msg = new Cmsg('1',tmp.split("\\s+")[1],tmp.split("\\s+")[2]); 
+			 				break;
+			 			case '2':
+			 				msg = new Cmsg('2',tmp.split("\\s+")[1],tmp.split("\\s+")[2],tmp.split("\\s+")[3],tmp.split("\\s+")[4],tmp.split("\\s+")[5],Integer.parseInt(tmp.split("\\s+")[6]));
+			 				break;
+			 			}
+			 		//msg = new Cmsg(tmp.charAt(0),tmp.substring(1)); 
+			 		oos.writeObject(msg);     
+			 		oos.flush();
+			 	}			
 				oos.close();
 	         }catch(Exception e){
 	        	 System.out.println("Error at sendcmsg："+e);
