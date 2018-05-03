@@ -5,16 +5,35 @@ import java.net.*;
 import java.util.Scanner;
 
 public class Client {
-	//String id;
     public static void main(String[] args) {
  	
     	try {
          Socket s = new Socket("127.0.0.1",8887);
+         ObjectOutputStream oos= new ObjectOutputStream(s.getOutputStream());
+         Scanner scan = new Scanner(System.in);
          String tmp;
+         Cmsg clientmsg = null;
+         
          Thread t1 = new Thread(new GetSmsg(s));
-         t1.start();      
-         Thread t2= new Thread(new SendCmsg(s));
-         t2.start();
+         t1.start();  
+         
+         Thread t2;
+         while((tmp = scan.nextLine()).charAt(0) != '0')
+			 	{	
+			 		switch(tmp.charAt(0)) 
+			 			{
+			 			case '1':
+			 				clientmsg = new Cmsg('1',tmp.split("\\s+")[1],tmp.split("\\s+")[2]); 
+			 				break;
+			 			case '2':
+			 				clientmsg = new Cmsg('2',tmp.split("\\s+")[1],tmp.split("\\s+")[2],tmp.split("\\s+")[3],tmp.split("\\s+")[4],tmp.split("\\s+")[5],Integer.parseInt(tmp.split("\\s+")[6]));
+			 				break;
+			 			}
+			 		t2= new Thread(new SendCmsg(s,clientmsg,oos));
+			        t2.start();
+			 	}
+         oos.close();
+         scan.close();
     	} catch(IOException e) {
     		System.out.println("Error at Client:"+e);
     	}
@@ -24,7 +43,7 @@ public class Client {
 
 class GetSmsg implements Runnable
 {
-	String Smsg;
+	Smsg message;
 	Socket s;
 	public GetSmsg(Socket ss)
 	{
@@ -33,11 +52,11 @@ class GetSmsg implements Runnable
 	public void run()
 	{
 		try{
-		 BufferedReader br = new BufferedReader(new InputStreamReader(s.getInputStream()));
+			ObjectInputStream ois = new ObjectInputStream(s.getInputStream());
 		 while(true)
 		 {
-            	 Smsg = br.readLine();
-            	 System.out.println("Server response:" + Smsg);
+            	 message = (Smsg)ois.readObject();
+            	 System.out.println("Server response:" + message.msg);
          }
 		}catch(Exception e)
 		{
@@ -49,33 +68,19 @@ class GetSmsg implements Runnable
 class SendCmsg implements Runnable
 {
 	public static Socket s;
-	public SendCmsg(Socket ss)
+	public Cmsg msg;
+	public ObjectOutputStream oos;
+	public SendCmsg(Socket ss,Cmsg clientmsg,ObjectOutputStream oos_)
 	{
 		s = ss;
+		msg = clientmsg;
+		oos = oos_;
 	}
 	public void run()
 	{
-		try {
-			 	ObjectOutputStream oos= new ObjectOutputStream(s.getOutputStream());
-		    	Scanner scan = new Scanner(System.in);
-		    	Cmsg msg = null;
-			 	String tmp;
-			 	while((tmp = scan.nextLine()).charAt(0) != '0')
-			 	{	
-			 		switch(tmp.charAt(0)) 
-			 			{
-			 			case '1':
-			 				msg = new Cmsg('1',tmp.split("\\s+")[1],tmp.split("\\s+")[2]); 
-			 				break;
-			 			case '2':
-			 				msg = new Cmsg('2',tmp.split("\\s+")[1],tmp.split("\\s+")[2],tmp.split("\\s+")[3],tmp.split("\\s+")[4],tmp.split("\\s+")[5],Integer.parseInt(tmp.split("\\s+")[6]));
-			 				break;
-			 			}
-			 		//msg = new Cmsg(tmp.charAt(0),tmp.substring(1)); 
-			 		oos.writeObject(msg);     
-			 		oos.flush();
-			 	}			
-				oos.close();
+		try {		    	
+			 	oos.writeObject(msg);     
+			 	oos.flush();		
 	         }catch(Exception e){
 	        	 System.out.println("Error at sendcmsg："+e);
 	        	 }	 
