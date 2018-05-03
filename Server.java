@@ -34,10 +34,11 @@ public class Server implements Runnable //让服务器变为线程体
 	{		
 		try {
 		System.out.println("客户端:"+s.getInetAddress().getLocalHost()+"已连接到服务器");
-        Thread t1 = new Thread(new GetCmsg(s,dbConn)); //接受客户端信息的线程
-        Thread t2 = new Thread(new SendSmsg(s));//发送服务器信息的线程
+		//ObjectOutputStream oos= new ObjectOutputStream(s.getOutputStream());
+        Thread t1 = new Thread(new GetCmsg(s,dbConn)); //接受客户端信息的线程并调用创建SendSmsg线程回复
+        //Thread t2 = new Thread(new SendSmsg(s));//发送服务器信息的线程
         t1.start();
-        t2.start();
+        //t2.start();
 		}catch (Exception e)
 		{
 			System.out.println("Error at server:"+e);
@@ -71,43 +72,6 @@ public class Server implements Runnable //让服务器变为线程体
 	}
 }
 
-class Cmsg implements Serializable //序列化客户端信息，使socket可以传输对象
-{
-	public char msg_type;
-	public String msg;
-	public String id;
-	public String pwd;
-	public String nickname;
-	public String truename;
-	public String sex;
-	public int age;
-	public Cmsg(char msg_type, String msg)
-	{
-		this.msg_type = msg_type;
-		this.msg = msg;
-	}
-	public Cmsg(char msg_type, String id,String pwd)
-	{
-		this.msg_type = msg_type;
-		this.id = id;
-		this.pwd = pwd;
-	}
-	public Cmsg(char msg_type, String id,String pwd,String nickname,String truename,String sex,int age)
-	{
-		this.msg_type = msg_type;
-		this.id = id;
-		this.pwd = pwd;
-		this.nickname = nickname;
-		this.truename = truename;
-		this.sex = sex;
-		this.age = age;
-	}
-	public void ShowCmsg()
-	{
-		System.out.printf("msg_type:%c msg:%s id:%s	pwd:%s nickname:%s truename:%s sex:%s age:%d\n",msg_type,msg,id,pwd,nickname,truename,sex,age);
-	}
-}
-
 class GetCmsg implements Runnable //接受客户端信息
 {
 	Cmsg message;
@@ -125,6 +89,9 @@ class GetCmsg implements Runnable //接受客户端信息
 				 ResultSet rs;
 				 String sqlcmd;
 				 ObjectInputStream ois = new ObjectInputStream(s.getInputStream());
+				 ObjectOutputStream oos= new ObjectOutputStream(s.getOutputStream());
+				 Smsg servermsg;
+				 Thread t;
 				 while((message = (Cmsg)ois.readObject()).msg_type != '0') //0代表用户退出
 				 {
 					 switch(message.msg_type) 
@@ -134,20 +101,49 @@ class GetCmsg implements Runnable //接受客户端信息
 							 rs = stmt.executeQuery(sqlcmd);
 							 rs.next();
 							 String pwd = rs.getString("OPassWord");
-							 if(pwd.equals(message.pwd)) System.out.println("Client " +s.getInetAddress().getLocalHost()+ ":登陆成功");
-							 else System.out.println("Client " +s.getInetAddress().getLocalHost()+ ":账号不存在或密码错误");
+							 if(pwd.equals(message.pwd)) 
+							 {
+								 servermsg = new Smsg('1',"登陆成功");
+								 System.out.println("Client " +s.getInetAddress().getLocalHost()+ ":登陆成功");
+								 t = new Thread(new SendSmsg(s,servermsg,oos));
+								 t.start();
+							 }
+							 else 
+							{
+								 servermsg = new Smsg('1',"账号不存在或密码错误");
+								 System.out.println("Client " +s.getInetAddress().getLocalHost()+ ":账号不存在或密码错误");
+								 t = new Thread(new SendSmsg(s,servermsg,oos));
+								 t.start();
+							}
 							 break;
 					 	case '2'://2代表注册
-					 		//2 1111 1234 meixin yanz 男 21
 					 		sqlcmd = "select OID from OOUser where OID = "+message.id;
 					 		rs = stmt.executeQuery(sqlcmd);
-							if(rs.next() == true) System.out.println("账号已存在");
+							if(rs.next() == true) 
+								{
+								 servermsg = new Smsg('2',"账号已存在");
+								 System.out.println("Client " +s.getInetAddress().getLocalHost()+ ":账号已存在");
+								 t = new Thread(new SendSmsg(s,servermsg,oos));
+								 t.start();
+								}
 							else 
 								{
 									sqlcmd = String.format("INSERT INTO OOUser VALUES('%s','%s','%s','%s',%d,'%s')",message.id,message.pwd,message.nickname,message.truename,message.age,message.sex);
 									int upresult = stmt.executeUpdate(sqlcmd);	
-									if(upresult == 1) System.out.println("注册成功！");
-									else System.out.println("注册失败！");
+									if(upresult == 1)
+										{
+										servermsg = new Smsg('2',"注册成功");
+										System.out.println("Client " +s.getInetAddress().getLocalHost()+ ":注册成功！");
+										 t = new Thread(new SendSmsg(s,servermsg,oos));
+										 t.start();
+										}
+									else 
+										{
+										servermsg = new Smsg('2',"注册失败");
+										System.out.println("Client " +s.getInetAddress().getLocalHost()+ ":注册失败！");
+										 t = new Thread(new SendSmsg(s,servermsg,oos));
+										 t.start();
+										}
 								}
 					 		break;
 					 	case '3'://3表示发送消息
@@ -164,23 +160,20 @@ class GetCmsg implements Runnable //接受客户端信息
 
 class SendSmsg implements Runnable //发送服务器信息
 {
-	String Smsg;
+	Smsg msg;
 	Socket s;
-	public SendSmsg(Socket socket)
+	ObjectOutputStream oos;
+	public SendSmsg(Socket socket,Smsg servermsg,ObjectOutputStream oos_)
 	{
 		s = socket;
+		msg = servermsg;
+		oos = oos_;
 	}
 	public void run()
 	{
 		try {
-			 PrintWriter out = new PrintWriter(s.getOutputStream());
-			 Scanner scan = new Scanner(System.in);
-			 while(true)
-			 {
-				 Smsg = scan.nextLine();
-				 out.println(Smsg);
-	             out.flush();
-	         }
+			oos.writeObject(msg);     
+		 	oos.flush();
 		}catch(Exception e)
 		{
 			System.out.println("Error at sendmsg："+e);
